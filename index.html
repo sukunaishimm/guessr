@@ -1,57 +1,62 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Friend Guessr 👀</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Friend Guessr — GuessR</title>
+  <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
-  <div class="container">
-
-    <!-- Navigation / Tabs -->
-    <div class="tabs">
-      <button class="tab-btn" data-tab="home">Home</button>
-      <button class="tab-btn" data-tab="me">Me</button>
-      <button class="tab-btn" data-tab="how">How to Play</button>
-    </div>
-
-    <!-- Home / Gameplay -->
-    <div id="home" class="tab-content">
+  <main id="app" class="center">
+    <header class="header">
       <h1>Friend Guessr 👀</h1>
-      <div id="game-screen">
-        <p id="cast-text">Cast text will appear here</p>
-        <div id="options-container"></div>
-        <p id="timer">7</p>
+      <p class="subtitle">Can you guess who said this?</p>
+    </header>
+
+    <section id="frame" class="frame">
+      <!-- Dynamic content injected by app.js -->
+    </section>
+
+    <nav class="controls">
+      <button id="playBtn" class="btn primary">Play</button>
+      <button id="howBtn" class="btn">How it works</button>
+      <div id="foot" class="footnote"></div>
+    </nav>
+  </main>
+
+  <!-- Minimal loaders / templates -->
+  <template id="start-template">
+    <div class="start-card">
+      <h2>Friend Guessr</h2>
+      <p>Try to beat your friends — 5 quick questions from people you follow.</p>
+      <div class="meta">Fast rounds — share your scorecard on Warpcast</div>
+    </div>
+  </template>
+
+  <template id="question-template">
+    <div class="question-card">
+      <div class="cast-preview" id="castPreview"></div>
+      <div class="options" id="options"></div>
+      <div class="timer" id="timer"></div>
+    </div>
+  </template>
+
+  <template id="flash-template">
+    <div class="flash correct"></div>
+  </template>
+
+  <template id="score-template">
+    <div class="score-card">
+      <h2 id="scoreText"></h2>
+      <p id="rankText"></p>
+      <div class="score-actions">
+        <button id="shareBtn" class="btn primary">Share Score</button>
+        <button id="challengeBtn" class="btn">Challenge Friends</button>
+        <button id="againBtn" class="btn">Play Again</button>
       </div>
-      <button id="start-btn">Start Game</button>
     </div>
+  </template>
 
-    <!-- Me / Profile -->
-    <div id="me" class="tab-content" style="display:none;">
-      <h2>My Profile</h2>
-      <img id="user-pic" src="" alt="Profile Picture" class="profile-pic">
-      <p id="username">Username: </p>
-      <p id="streak-display">Current Streak: 0</p>
-      <p id="high-score">High Score: 0</p>
-    </div>
-
-    <!-- How to Play -->
-    <div id="how" class="tab-content" style="display:none;">
-      <h2>How to Play</h2>
-      <ul>
-        <li>Guess who made the cast shown.</li>
-        <li>Tap one of the three options.</li>
-        <li>Each correct answer increases your streak.</li>
-        <li>Share your score and challenge friends!</li>
-      </ul>
-    </div>
-
-  </div>
-
-  <!-- Farcaster SDK -->
-  <script type="module" src="farcaster.js"></script>
-  <!-- Game logic -->
-  <script type="module" src="app.js"></script>
+  <script type="module" src="./app.js"></script>
 </body>
 </html>
