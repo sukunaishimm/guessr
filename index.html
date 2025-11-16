@@ -1,72 +1,57 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>GuessR</title>
-  <link rel="stylesheet" href="style.css"/>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Friend Guessr 👀</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="container">
-    <!-- Start Screen -->
-    <div id="start-screen">
-      <h1>Friend Guessr 👀</h1>
-      <p>Can you guess who said this?</p>
-      <button id="play-btn">Play Now</button>
-      <button id="how-btn">How It Works</button>
-      <button id="addApp-btn">Add to Mini Apps</button>
+
+    <!-- Navigation / Tabs -->
+    <div class="tabs">
+      <button class="tab-btn" data-tab="home">Home</button>
+      <button class="tab-btn" data-tab="me">Me</button>
+      <button class="tab-btn" data-tab="how">How to Play</button>
     </div>
 
-    <!-- Game Screen -->
-    <div id="game-screen" style="display:none;">
-      <div id="question-container">
+    <!-- Home / Gameplay -->
+    <div id="home" class="tab-content">
+      <h1>Friend Guessr 👀</h1>
+      <div id="game-screen">
         <p id="cast-text">Cast text will appear here</p>
-        <div id="options-container">
-          <!-- Answer buttons will be generated here -->
-        </div>
-      </div>
-      <div id="timer-container">
+        <div id="options-container"></div>
         <p id="timer">7</p>
       </div>
+      <button id="start-btn">Start Game</button>
     </div>
 
-    <!-- Score Screen -->
-    <div id="score-screen" style="display:none;">
-      <h2>Your score: <span id="score-display">0</span>/5</h2>
-      <p id="rank-display">Your rank: #?</p>
-      <button id="share-btn">Share Score</button>
-      <button id="challenge-btn">Challenge Friends</button>
-      <button id="play-again-btn">Play Again</button>
+    <!-- Me / Profile -->
+    <div id="me" class="tab-content" style="display:none;">
+      <h2>My Profile</h2>
+      <img id="user-pic" src="" alt="Profile Picture" class="profile-pic">
+      <p id="username">Username: </p>
+      <p id="streak-display">Current Streak: 0</p>
+      <p id="high-score">High Score: 0</p>
     </div>
+
+    <!-- How to Play -->
+    <div id="how" class="tab-content" style="display:none;">
+      <h2>How to Play</h2>
+      <ul>
+        <li>Guess who made the cast shown.</li>
+        <li>Tap one of the three options.</li>
+        <li>Each correct answer increases your streak.</li>
+        <li>Share your score and challenge friends!</li>
+      </ul>
+    </div>
+
   </div>
 
-  <!-- Farcaster Mini-App SDK -->
-  <script type="module">
-    import { sdk } from "https://esm.sh/@farcaster/miniapp-sdk";
-
-    (async () => {
-      await sdk.actions.ready();
-      console.log("Farcaster MiniApp SDK ready");
-
-      // Quick auth
-      const authData = await sdk.quickAuth.getToken();
-      const userFid = authData?.fid;
-      console.log("User FID:", userFid);
-
-      // Add Mini App button
-      document.getElementById("addApp-btn").onclick = async () => {
-        try {
-          await sdk.actions.addMiniApp();
-          alert("Friend Guessr added to your Mini Apps!");
-        } catch (err) {
-          console.error(err);
-          alert("Failed to add Mini App.");
-        }
-      };
-    })();
-  </script>
-
-  <!-- Game logic JS will go here -->
-  <script src="app.js"></script>
+  <!-- Farcaster SDK -->
+  <script type="module" src="farcaster.js"></script>
+  <!-- Game logic -->
+  <script type="module" src="app.js"></script>
 </body>
 </html>
