@@ -97,3 +97,7 @@ body{
   .frame{padding:12px}
   .avatar-btn img{width:48px;height:48px}
   }
+
+/* paste your previous style.css content and add this rule near the top or end */
+button { -webkit-tap-highlight-color: transparent; }
+.avatar-btn { pointer-events: auto; }
