@@ -1,24 +1,14 @@
 /**
- * GuessR — frontend-only miniapp shell
- *
- * Notes:
- * - This is a client-only implementation that expects a backend with the API contract described in the blueprint.
- * - Configure BACKEND_ROOT to point at your Render/Vercel backend.
- * - The app uses the Farcaster miniapp SDK ESM bundle via esm.sh; adapt import to your bundler if needed.
- *
- * Files:
- *  - index.html (this file)
- *  - style.css
- *  - app.js
+ * Fixed app.js — ensures DOM is ready before attaching listeners.
  */
 
 // CONFIG: set your backend root URL here
 const BACKEND_ROOT = '' // e.g. 'https://guessr-api.example.com'
 
-// Farcaster miniapp SDK (ESM bundle)
+// Import Farcaster miniapp SDK (optional; if you don't have it yet you can mock)
 import * as MiniAppSDK from 'https://esm.sh/@farcaster/miniapp-sdk@1.0.0';
 
-// Simple state
+// STATE
 const STATE = {
   fid: null,
   profile: null,
@@ -28,29 +18,49 @@ const STATE = {
   answers: [],
   score: 0,
   startedAt: null,
-  timer: null
+  timer: null,
+  rankPercentile: null,
+  shareId: null
 };
 
-const app = document.getElementById('app');
-const frame = document.getElementById('frame');
-const playBtn = document.getElementById('playBtn');
-const howBtn = document.getElementById('howBtn');
-const foot = document.getElementById('foot');
+// Helper: escape HTML
+function escapeHtml(s = '') {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
 
-// UI helpers
-function clearFrame() {
+// UI rendering helpers (query DOM at runtime)
+function getEls() {
+  return {
+    app: document.getElementById('app'),
+    frame: document.getElementById('frame'),
+    playBtn: document.getElementById('playBtn'),
+    howBtn: document.getElementById('howBtn'),
+    foot: document.getElementById('foot'),
+    templates: {
+      start: document.getElementById('start-template'),
+      question: document.getElementById('question-template'),
+      score: document.getElementById('score-template'),
+      flash: document.getElementById('flash-template')
+    }
+  };
+}
+
+function clearFrame(frame) {
   frame.innerHTML = '';
 }
 
-function renderStart() {
-  clearFrame();
-  const tpl = document.getElementById('start-template').content.cloneNode(true);
+function renderStart(frame, foot, templates) {
+  clearFrame(frame);
+  const tpl = templates.start.content.cloneNode(true);
   frame.appendChild(tpl);
   foot.textContent = 'Fast 5-question rounds — designed for Frames Feed';
 }
 
-function renderHow() {
-  clearFrame();
+function renderHow(frame, foot) {
+  clearFrame(frame);
   const div = document.createElement('div');
   div.className = 'how';
   div.innerHTML = `
@@ -65,20 +75,20 @@ function renderHow() {
   foot.textContent = '';
 }
 
-function renderQuestion(q) {
-  clearFrame();
-  const tpl = document.getElementById('question-template').content.cloneNode(true);
+function renderQuestion(frame, templates, q) {
+  clearFrame(frame);
+  const tpl = templates.question.content.cloneNode(true);
   frame.appendChild(tpl);
 
   const castPreview = frame.querySelector('#castPreview');
-  // show partial/blurred text
   castPreview.innerHTML = `<div class="blur">${escapeHtml(q.castPreview)}</div>`;
 
   const optionsEl = frame.querySelector('#options');
   optionsEl.innerHTML = '';
-  q.options.forEach((opt, i) => {
+  q.options.forEach((opt) => {
     const b = document.createElement('button');
     b.className = 'avatar-btn';
+    b.type = 'button';
     b.dataset.fid = opt.fid;
     b.innerHTML = `
       <img src="${opt.avatar}" alt="${escapeHtml(opt.username)}" />
@@ -88,14 +98,22 @@ function renderQuestion(q) {
     optionsEl.appendChild(b);
   });
 
-  // optional timer
-  startQuestionTimer(7, frame.querySelector('#timer'), () => {
-    // auto-fail if time runs out: treat as wrong
-    handleAnswer(q.questionId, null);
-  });
+  // start timer
+  startQuestionTimer(7, frame.querySelector('#timer'), () => handleAnswer(q.questionId, null));
 }
 
-// flash animation for correct/incorrect
+function renderScore(frame, templates) {
+  clearFrame(frame);
+  const tpl = templates.score.content.cloneNode(true);
+  frame.appendChild(tpl);
+  frame.querySelector('#scoreText').textContent = `You got ${STATE.score}/5 right!`;
+  frame.querySelector('#rankText').textContent = `Top ${STATE.rankPercentile || '—'} of FC players today`;
+  document.getElementById('shareBtn').addEventListener('click', shareScore);
+  document.getElementById('challengeBtn').addEventListener('click', challengeFriends);
+  document.getElementById('againBtn').addEventListener('click', startGame);
+}
+
+// Flash
 function flash(correct = true) {
   const f = document.createElement('div');
   f.className = 'flash ' + (correct ? 'correct' : 'incorrect');
@@ -103,33 +121,13 @@ function flash(correct = true) {
   setTimeout(() => f.remove(), 200);
 }
 
-function renderScore() {
-  clearFrame();
-  const tpl = document.getElementById('score-template').content.cloneNode(true);
-  frame.appendChild(tpl);
-  frame.querySelector('#scoreText').textContent = `You got ${STATE.score}/5 right!`;
-  frame.querySelector('#rankText').textContent = `Top ${STATE.rankPercentile || '—'} of FC players today`;
-  foot.textContent = '';
-
-  document.getElementById('shareBtn').addEventListener('click', shareScore);
-  document.getElementById('challengeBtn').addEventListener('click', challengeFriends);
-  document.getElementById('againBtn').addEventListener('click', startGame);
-}
-
-// helpers
-function escapeHtml(s = '') {
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
+// Timer
 function startQuestionTimer(seconds, el, onExpired) {
   clearInterval(STATE.timer);
   let t = seconds;
-  el.textContent = '';
-  el.classList.add('visible');
+  if (!el) return;
   el.textContent = t;
+  el.classList.add('visible');
   STATE.timer = setInterval(() => {
     t -= 1;
     if (t <= 0) {
@@ -143,10 +141,9 @@ function startQuestionTimer(seconds, el, onExpired) {
   }, 1000);
 }
 
-// API helpers — these call your backend. If BACKEND_ROOT is empty, we use a mocked local flow.
+// API mocks / calls
 async function apiStart(fid) {
   if (!BACKEND_ROOT) {
-    // mock: provide a random seed
     return { questionsSeed: Math.random().toString(36).slice(2), availableCount: 20 };
   }
   const res = await fetch(`${BACKEND_ROOT}/api/start?fid=${encodeURIComponent(fid)}`);
@@ -155,7 +152,6 @@ async function apiStart(fid) {
 
 async function apiQuestion(seed, idx) {
   if (!BACKEND_ROOT) {
-    // mock question: random text and 3 fake users, one correct
     const users = Array.from({length:3}).map((_,i)=>({
       fid: `fid_${Math.floor(Math.random()*10000)}${i}`,
       username: `user${Math.floor(Math.random()*1000)}${i}`,
@@ -163,14 +159,13 @@ async function apiQuestion(seed, idx) {
     }));
     const correctIdx = Math.floor(Math.random()*3);
     const castPreview = ["Just saw the wildest thing", "Can't believe this drop", "Learning to build in public", "This made my day"][Math.floor(Math.random()*4)];
-    const q = {
+    return {
       questionId: `${seed}_${idx}`,
-      castPreview: castPreview,
+      castPreview,
       options: users,
       correctFid: users[correctIdx].fid,
       expiresAt: new Date(Date.now()+60000).toISOString()
     };
-    return q;
   }
   const res = await fetch(`${BACKEND_ROOT}/api/question?seed=${encodeURIComponent(seed)}&idx=${idx}`);
   return await res.json();
@@ -178,10 +173,8 @@ async function apiQuestion(seed, idx) {
 
 async function apiScore(payload) {
   if (!BACKEND_ROOT) {
-    // basic server-side validation mock
-    const correctCount = payload.answers.reduce((acc,a)=> acc + (a.selectedFid && Math.random() > 0.4 ? 1 : 0), 0);
-    const score = Math.min(5, correctCount);
-    return { score, streak: 0, rankPercentile: Math.max(1, Math.floor(Math.random()*100)), shareId: 'mock_share_' + Date.now() };
+    const correctCount = STATE.score; // we tracked it client-side in this mock
+    return { score: correctCount, streak: 0, rankPercentile: Math.max(1, Math.floor(Math.random()*100)), shareId: 'mock_share_' + Date.now() };
   }
   const res = await fetch(`${BACKEND_ROOT}/api/score`, {
     method: 'POST',
@@ -191,20 +184,23 @@ async function apiScore(payload) {
   return await res.json();
 }
 
-// Game flow
+// Flow handlers
 async function startGame() {
-  // require login/auth to use Farcaster features — we'll attempt to get basic profile via the SDK
-  // NOTE: In production, use SIWE + backend exchange as in the blueprint.
+  const { frame, foot, templates } = getEls();
   try {
     foot.textContent = 'Signing in to Farcaster...';
-    const sdk = await MiniAppSDK.init();
-    // request basic profile permission via SDK
-    const ok = await sdk.requestPermissions({scopes: ['read_profile', 'read_following']}).catch(()=>false);
+    const sdk = await MiniAppSDK.init().catch(()=>null);
+    let ok = false;
+    if (sdk && sdk.requestPermissions) {
+      ok = await sdk.requestPermissions({scopes: ['read_profile', 'read_following']}).catch(()=>false);
+    } else {
+      ok = true; // allow mock flow when SDK not available
+    }
     if (!ok) {
       foot.textContent = 'Permissions required to fetch casts from people you follow.';
       return;
     }
-    const profile = await sdk.getProfile();
+    const profile = sdk && sdk.getProfile ? await sdk.getProfile().catch(()=>null) : null;
     STATE.fid = profile?.fid || `fid_local_${Math.random().toString(36).slice(2)}`;
     STATE.profile = profile || { username: 'You', pfp: '' };
 
@@ -217,7 +213,6 @@ async function startGame() {
     STATE.score = 0;
     STATE.startedAt = Date.now();
 
-    // prefetch 5 questions (fast)
     for (let i=0;i<5;i++){
       const q = await apiQuestion(STATE.seed, i);
       STATE.questions.push(q);
@@ -225,41 +220,35 @@ async function startGame() {
     playRound();
   } catch (err) {
     console.error(err);
+    const { foot } = getEls();
     foot.textContent = 'Could not start the game. Try again.';
   }
 }
 
 function playRound() {
+  const { frame, templates } = getEls();
   if (STATE.idx >= STATE.questions.length) {
     endGame();
     return;
   }
   const q = STATE.questions[STATE.idx];
-  renderQuestion(q);
+  renderQuestion(frame, templates, q);
 }
 
 async function handleAnswer(questionId, selectedFid) {
-  // stop timer
   clearInterval(STATE.timer);
-
-  // find question and verify (client-side minimal)
   const q = STATE.questions[STATE.idx];
   const correct = selectedFid && selectedFid === q.correctFid;
-
-  // optimistic UI flash
   flash(correct);
   if (correct) STATE.score += 1;
-
   STATE.answers.push({ questionId, selectedFid, ts: Date.now() });
   STATE.idx += 1;
-
-  // small delay to mimic flash frame
   await new Promise(r => setTimeout(r, 220));
   playRound();
 }
 
 async function endGame() {
-  // submit score to backend
+  const { foot, frame, templates } = getEls();
   foot.textContent = 'Submitting score...';
   const payload = {
     sessionId: STATE.seed,
@@ -270,25 +259,31 @@ async function endGame() {
   const res = await apiScore(payload);
   STATE.rankPercentile = res.rankPercentile;
   STATE.shareId = res.shareId;
-  renderScore();
+  renderScore(frame, templates);
   foot.textContent = 'Share your result to Warpcast and challenge friends!';
 }
 
-// Sharing (requires post_cast permission); this uses the Farcaster miniapp SDK client post flow
 async function shareScore() {
   try {
-    const sdk = await MiniAppSDK.init();
-    const gotPost = await sdk.requestPermissions({scopes: ['post_cast']}).catch(()=>false);
+    const sdk = await MiniAppSDK.init().catch(()=>null);
+    let gotPost = false;
+    if (sdk && sdk.requestPermissions) {
+      gotPost = await sdk.requestPermissions({scopes: ['post_cast']}).catch(()=>false);
+    } else {
+      gotPost = true;
+    }
     if (!gotPost) {
       alert('Permission required to post a cast. Grant when prompted to share.');
       return;
     }
-    // craft a simple share message
     const text = `I scored ${STATE.score}/5 on Friend Guessr — can you beat me? #GuessR`;
-    // if backend generated an OG card, use its URL; else we post text-only
     const media = STATE.shareId && BACKEND_ROOT ? [{ type: 'image', url: `${BACKEND_ROOT}/api/sharecard?id=${STATE.shareId}` }] : [];
-    await sdk.createCast({ text, media });
-    alert('Shared to Warpcast!');
+    if (sdk && sdk.createCast) {
+      await sdk.createCast({ text, media });
+      alert('Shared to Warpcast!');
+    } else {
+      alert('Mock share: ' + text);
+    }
   } catch (err) {
     console.error(err);
     alert('Could not share your score.');
@@ -297,23 +292,35 @@ async function shareScore() {
 
 async function challengeFriends() {
   try {
-    const sdk = await MiniAppSDK.init();
-    const gotPost = await sdk.requestPermissions({scopes: ['post_cast']}).catch(()=>false);
+    const sdk = await MiniAppSDK.init().catch(()=>null);
+    let gotPost = false;
+    if (sdk && sdk.requestPermissions) {
+      gotPost = await sdk.requestPermissions({scopes: ['post_cast']}).catch(()=>false);
+    } else {
+      gotPost = true;
+    }
     if (!gotPost) {
       alert('Permission required to post a cast. Grant when prompted to challenge.');
       return;
     }
-    // prefill with a callout tagging up to 3 sample friends (in production, let user pick)
     const text = `I got ${STATE.score}/5 on Friend Guessr. Can you beat me? @friend1 @friend2 @friend3 #GuessR`;
-    await sdk.createCast({ text });
-    alert('Challenge posted!');
+    if (sdk && sdk.createCast) {
+      await sdk.createCast({ text });
+      alert('Challenge posted!');
+    } else {
+      alert('Mock challenge: ' + text);
+    }
   } catch (err) {
     console.error(err);
     alert('Could not post challenge.');
   }
 }
 
-// Init
-renderStart();
-playBtn.addEventListener('click', startGame);
-howBtn.addEventListener('click', renderHow);
+// Entry: wait for DOM ready then attach global listeners
+window.addEventListener('DOMContentLoaded', () => {
+  const { frame, playBtn, howBtn, foot, templates } = getEls();
+  renderStart(frame, foot, templates);
+  // Attach listeners now that elements exist
+  playBtn.addEventListener('click', startGame);
+  howBtn.addEventListener('click', () => renderHow(frame, foot));
+});
