@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>GuessR</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+  <div class="container">
+    <!-- Start Screen -->
+    <div id="start-screen">
+      <h1>Friend Guessr 👀</h1>
+      <p>Can you guess who said this?</p>
+      <button id="play-btn">Play Now</button>
+      <button id="how-btn">How It Works</button>
+      <button id="addApp-btn">Add to Mini Apps</button>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen" style="display:none;">
+      <div id="question-container">
+        <p id="cast-text">Cast text will appear here</p>
+        <div id="options-container">
+          <!-- Answer buttons will be generated here -->
+        </div>
+      </div>
+      <div id="timer-container">
+        <p id="timer">7</p>
+      </div>
+    </div>
+
+    <!-- Score Screen -->
+    <div id="score-screen" style="display:none;">
+      <h2>Your score: <span id="score-display">0</span>/5</h2>
+      <p id="rank-display">Your rank: #?</p>
+      <button id="share-btn">Share Score</button>
+      <button id="challenge-btn">Challenge Friends</button>
+      <button id="play-again-btn">Play Again</button>
+    </div>
+  </div>
+
+  <!-- Farcaster Mini-App SDK -->
+  <script type="module">
+    import { sdk } from "https://esm.sh/@farcaster/miniapp-sdk";
+
+    (async () => {
+      await sdk.actions.ready();
+      console.log("Farcaster MiniApp SDK ready");
+
+      // Quick auth
+      const authData = await sdk.quickAuth.getToken();
+      const userFid = authData?.fid;
+      console.log("User FID:", userFid);
+
+      // Add Mini App button
+      document.getElementById("addApp-btn").onclick = async () => {
+        try {
+          await sdk.actions.addMiniApp();
+          alert("Friend Guessr added to your Mini Apps!");
+        } catch (err) {
+          console.error(err);
+          alert("Failed to add Mini App.");
+        }
+      };
+    })();
+  </script>
+
+  <!-- Game logic JS will go here -->
+  <script src="app.js"></script>
+</body>
+</html>
